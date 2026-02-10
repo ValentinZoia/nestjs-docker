@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nestjs-api-deployment
+  labels:
+    app: nestjs-api
+spec:
+  replicas: 1 # Número de instancias (pods) que queres ejecutar
+  selector:
+    matchLabels:
+      app: nestjs-api
+  template:
+    metadata:
+      labels:
+        app: nestjs-api
+    spec:
+      containers:
+        - name: nestjs-api-container
+          image: valenzo/nestjs-app:1.0.0 # La imagen local
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000 # Puerto donde corre tu app
+
+          resources:
+          # requests:  #recursos de cpu y memoria que requiere tu app, es opcional
+      #   memory: "128Mi"
+      #   cpu: "100m"
+      # limits:
+      #   memory: "256Mi"
+      #   cpu: "200m"
+      # environment:    # si necesitas variables de entorno
+    #   - name: NODE_ENV
+    #    value: "production"

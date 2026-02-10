@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nestjs-api-service
+spec:
+  selector:
+    app: nestjs-api
+  ports:
+    - port: 80 # puerto del service
+      targetPort: 3000 # puerto del contenedor
+  type: NodePort # para acceder fuera del cluster
