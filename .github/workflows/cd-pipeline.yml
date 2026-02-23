@@ -1,0 +1,192 @@
+name: CD Pipeline to Railway (staging & production) with Security and Notifications
+on:
+  push:
+    branches:
+      - staging
+    tags:
+      - 'v*' # Trigger en tags tipo v1.0.0
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag (e.g., v1.0.0)'
+        required: false
+        default: ''
+  release:
+    types: published
+env:
+  PORT: 3000
+  REGISTRY: docker.io
+  IMAGE_NAME: ${{ secrets.DOCKER_USER }}/nestjs-app
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: Setup, test, and build project
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Test application
+        run: npm test
+      - name: Build application
+        run: npm run build
+  security:
+    needs: test
+    runs-on: ubuntu-latest
+    name: Security scan with Trivy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+  build-and-push:
+    needs: security
+    runs-on: ubuntu-latest
+    name: Build and push Docker image
+    outputs:
+      image-tag: ${{ steps.set-tag.outputs.image-tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Determine image tag
+        id: set-tag
+        run: |
+          # Prioridad: workflow_dispatch > release > git tag > SHA
+          if [ "${{ github.event.inputs.image_tag }}" != "" ]; then
+            echo "image-tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "release" ]; then
+            echo "image-tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "image-tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "image-tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.set-tag.outputs.image-tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:staging
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ github.event_name == 'release' && format('{0}/{1}:latest', env.REGISTRY, env.IMAGE_NAME) || '' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+  security-image-scan:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    name: Security scan on Docker image
+    steps:
+      - name: Determine image tag to scan
+        id: scan-tag
+        run: |
+          if [ "${{ github.event.inputs.image_tag }}" != "" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+      - name: Run Trivy vulnerability scanner on image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.scan-tag.outputs.tag }}'
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+          severity: 'CRITICAL,HIGH'
+      - name: Upload Trivy image results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-image-results.sarif'
+  deploy-staging:
+    needs: security-image-scan
+    runs-on: ubuntu-latest
+    name: Deploy to Staging (Railway)
+    if: github.event_name != 'release'
+    steps:
+      - name: Determine staging image tag
+        id: staging-tag
+        run: |
+          if [ "${{ github.event.inputs.image_tag }}" != "" ]; then
+            echo "tag=${{ github.event.inputs.image_tag }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=staging" >> $GITHUB_OUTPUT
+          fi
+      - name: Deploy to Railway
+        uses: railway-deploy-action@v1
+        with:
+          token: ${{ secrets.RAILWAY_TOKEN }}
+          project: mi-proyecto
+          service: staging
+          environment: staging
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.staging-tag.outputs.tag }}
+      - name: Notify Slack - Staging Deployed
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          fields: repo,message,commit,author,service
+          author_name: 'Staging Deployment'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  deploy-production:
+    needs: security-image-scan
+    runs-on: ubuntu-latest
+    name: Deploy to Production (Railway)
+    if: github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - name: Deploy to Railway
+        uses: railway-deploy-action@v1
+        with:
+          token: ${{ secrets.RAILWAY_TOKEN }}
+          project: mi-proyecto
+          service: production
+          environment: production
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.release.tag_name }}
+      - name: Notify Slack - Production Deployed
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          fields: repo,message,commit,author,service
+          author_name: 'Production Deployment'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  notify-failure:
+    needs: [deploy-staging, deploy-production]
+    runs-on: ubuntu-latest
+    name: Notify on failure
+    if: failure()
+    steps:
+      - name: Notify Slack - Failure
+        uses: 8398a7/action-slack@v3
+        with:
+          status: failure
+          fields: repo,message,commit,author,job
+          author_name: 'CI/CD Pipeline Failed'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
