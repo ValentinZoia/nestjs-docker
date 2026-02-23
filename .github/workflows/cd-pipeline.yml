@@ -144,6 +144,14 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         with:
           service: staging
+      - name: Notify Slack - Staging Deployed
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          fields: repo,message,commit,author,service
+          author_name: 'Staging Deployment'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
   deploy-production:
     needs: security-image-scan
     runs-on: ubuntu-latest
@@ -156,6 +164,14 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         with:
           service: production
+      - name: Notify Slack - Production Deployed
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          fields: repo,message,commit,author,service
+          author_name: 'Production Deployment'
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
   notify-failure:
     needs: [deploy-staging, deploy-production]
     runs-on: ubuntu-latest
