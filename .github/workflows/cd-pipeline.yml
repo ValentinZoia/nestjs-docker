@@ -138,44 +138,24 @@ jobs:
           else
             echo "tag=staging" >> $GITHUB_OUTPUT
           fi
-      - name: Deploy to Railway
-        uses: railway-deploy-action@v1
-        with:
-          token: ${{ secrets.RAILWAY_TOKEN }}
-          project: mi-proyecto
-          service: staging
-          environment: staging
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.staging-tag.outputs.tag }}
-      - name: Notify Slack - Staging Deployed
-        uses: 8398a7/action-slack@v3
-        with:
-          status: success
-          fields: repo,message,commit,author,service
-          author_name: 'Staging Deployment'
+      - name: Deploy to Railway Staging
+        uses: bervProject/railway-deploy@main
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        with:
+          service: staging
   deploy-production:
     needs: security-image-scan
     runs-on: ubuntu-latest
     name: Deploy to Production (Railway)
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
-      - name: Deploy to Railway
-        uses: railway-deploy-action@v1
-        with:
-          token: ${{ secrets.RAILWAY_TOKEN }}
-          project: mi-proyecto
-          service: production
-          environment: production
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.release.tag_name }}
-      - name: Notify Slack - Production Deployed
-        uses: 8398a7/action-slack@v3
-        with:
-          status: success
-          fields: repo,message,commit,author,service
-          author_name: 'Production Deployment'
+      - name: Deploy to Railway Production
+        uses: bervProject/railway-deploy@main
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        with:
+          service: production
   notify-failure:
     needs: [deploy-staging, deploy-production]
     runs-on: ubuntu-latest
