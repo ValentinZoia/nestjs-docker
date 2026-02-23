@@ -17,6 +17,13 @@ env:
   PORT: 3000
   REGISTRY: docker.io
   IMAGE_NAME: ${{ secrets.DOCKER_USER }}/nestjs-app
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  id-token: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -50,7 +57,7 @@ jobs:
           format: 'sarif'
           output: 'trivy-results.sarif'
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
   build-and-push:
@@ -119,7 +126,7 @@ jobs:
           output: 'trivy-image-results.sarif'
           severity: 'CRITICAL,HIGH'
       - name: Upload Trivy image results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-image-results.sarif'
   deploy-staging:
