@@ -32,10 +32,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: '22'
       - name: Install dependencies
         run: npm ci
       - name: Test application
@@ -123,6 +122,7 @@ jobs:
         with:
           image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.scan-tag.outputs.tag }}'
           format: 'sarif'
+          exit-code: '1' # Fail the build if vulnerabilities found
           output: 'trivy-image-results.sarif'
           severity: 'CRITICAL,HIGH'
       - name: Upload Trivy image results to GitHub Security
