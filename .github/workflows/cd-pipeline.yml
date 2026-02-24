@@ -122,7 +122,7 @@ jobs:
         with:
           image-ref: '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.scan-tag.outputs.tag }}'
           format: 'sarif'
-          exit-code: '0' # Don't fail on vulnerabilities, just report them
+          exit-code: '0' # Dont fail on vulnerabilities
           output: 'trivy-image-results.sarif'
           ignore-unfixed: true # Skip vulnerabilities without fixes
           severity: 'CRITICAL,HIGH' # Only alert on critical and high severity
