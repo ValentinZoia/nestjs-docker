@@ -152,7 +152,7 @@ jobs:
       - name: Link Railway project
         run: railway link --project ${{ env.RAILWAY_PROJECT_ID }} --environment staging
       - name: Deploy to Railway Staging
-        run: railway redeploy --service staging
+        run: railway redeploy --service nestjs-app
 
   notify-staging:
     needs: deploy-staging
@@ -180,7 +180,7 @@ jobs:
       - name: Link Railway project
         run: railway link --project ${{ env.RAILWAY_PROJECT_ID }} --environment production
       - name: Deploy to Railway Production
-        run: railway redeploy --service production
+        run: railway redeploy --service nestjs-app
 
   notify-production:
     needs: deploy-production
