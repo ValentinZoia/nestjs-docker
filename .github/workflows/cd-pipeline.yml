@@ -134,6 +134,10 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy to Staging (Railway)
     if: github.event_name != 'release'
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+    container: ghcr.io/railwayapp/cli:latest
     steps:
       - name: Determine staging image tag
         id: staging-tag
@@ -145,12 +149,16 @@ jobs:
           else
             echo "tag=staging" >> $GITHUB_OUTPUT
           fi
+      - name: Link Railway project
+        run: railway link --project ${{ env.RAILWAY_PROJECT_ID }}
       - name: Deploy to Railway Staging
-        uses: bervProject/railway-deploy@main
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        with:
-          service: staging
+        run: railway redeploy --service staging --environment staging
+
+  notify-staging:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    name: Notify Staging Deployed
+    steps:
       - name: Notify Slack - Staging Deployed
         uses: 8398a7/action-slack@v3
         with:
@@ -164,13 +172,21 @@ jobs:
     runs-on: ubuntu-latest
     name: Deploy to Production (Railway)
     if: github.event_name == 'release' && github.event.action == 'published'
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+    container: ghcr.io/railwayapp/cli:latest
     steps:
+      - name: Link Railway project
+        run: railway link --project ${{ env.RAILWAY_PROJECT_ID }}
       - name: Deploy to Railway Production
-        uses: bervProject/railway-deploy@main
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        with:
-          service: production
+        run: railway redeploy --service production --environment production
+
+  notify-production:
+    needs: deploy-production
+    runs-on: ubuntu-latest
+    name: Notify Production Deployed
+    steps:
       - name: Notify Slack - Production Deployed
         uses: 8398a7/action-slack@v3
         with:
