@@ -135,7 +135,7 @@ jobs:
     name: Deploy to Staging (Railway)
     if: github.event_name != 'release'
     env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
     container: ghcr.io/railwayapp/cli:latest
     steps:
@@ -173,7 +173,7 @@ jobs:
     name: Deploy to Production (Railway)
     if: github.event_name == 'release' && github.event.action == 'published'
     env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
     container: ghcr.io/railwayapp/cli:latest
     steps:
