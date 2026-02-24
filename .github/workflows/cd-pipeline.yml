@@ -150,9 +150,9 @@ jobs:
             echo "tag=staging" >> $GITHUB_OUTPUT
           fi
       - name: Link Railway project
-        run: railway link --project ${{ env.RAILWAY_PROJECT_ID }} --environment staging
+        run: railway link --project ${{ env.RAILWAY_PROJECT_ID }}
       - name: Deploy to Railway Staging
-        run: railway redeploy --service nestjs-app
+        run: railway redeploy --service nestjs-app --yes
 
   notify-staging:
     needs: deploy-staging
@@ -178,9 +178,9 @@ jobs:
     container: ghcr.io/railwayapp/cli:latest
     steps:
       - name: Link Railway project
-        run: railway link --project ${{ env.RAILWAY_PROJECT_ID }} --environment production
+        run: railway link --project ${{ env.RAILWAY_PROJECT_ID }}
       - name: Deploy to Railway Production
-        run: railway redeploy --service nestjs-app
+        run: railway redeploy --service nestjs-app --yes
 
   notify-production:
     needs: deploy-production
